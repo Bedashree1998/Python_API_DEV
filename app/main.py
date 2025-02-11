@@ -1,25 +1,18 @@
 from random import randrange
 import time
-from typing import Optional
+from typing import List, Optional
 from fastapi import Depends, FastAPI, Response, status, HTTPException
 from fastapi.params import Body
 from pydantic import BaseModel
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from . import models
+from . import models, schema
 from sqlalchemy.orm import Session
 from .database import engine,get_db
 
 models.Base.metadata.create_all(bind = engine)
 
 app = FastAPI()
-
-
-class Post(BaseModel):
-    title: str
-    content: str
-    published: bool = True
-    rating: Optional[int] = None
 while True:
 
     try:
@@ -37,9 +30,9 @@ while True:
 def root():
     return {"message": "Hello World!"}
 
-@app.get("/sqlalchemy")
-def test_posts(db:Session = Depends(get_db)):
-    return {"status" : "success"}
+# @app.get("/sqlalchemy")
+# def test_posts(db:Session = Depends(get_db)):
+#     return {"status" : "success"}
     
 
 my_posts = [{"title":"title of post 1", "content": "Content of post 1","id": 1},{"title":"favorite foods", "content": "I like pizza","id": 2}]
@@ -54,7 +47,7 @@ def find_index_post(id):
             if p["id"] == id:
              return i
 
-@app.get("/posts")
+@app.get("/posts", response_model=List[schema.Post])
 def get_posts(db:Session = Depends(get_db)):
     # cursor.execute("""SELECT * FROM posts""")
     # posts = cursor.fetchall()
@@ -65,8 +58,8 @@ def get_posts(db:Session = Depends(get_db)):
     return {"data": posts}
 
     
-@app.post("/posts", status_code= status.HTTP_201_CREATED)
-def create_posts(post: Post,db:Session = Depends(get_db)):
+@app.post("/posts", status_code= status.HTTP_201_CREATED,response_model=schema.Post)
+def create_posts(post: schema.PostCreate ,db:Session = Depends(get_db)):
     # print(post)
     # print(post.model_dump())
     # return {"message": "successfully created posts"}
@@ -97,7 +90,7 @@ def create_posts(post: Post,db:Session = Depends(get_db)):
 #     post = my_posts[len(my_posts)-1]
 #     return {"detail" : post}
 
-@app.get("/posts/{id}")
+@app.get("/posts/{id}", response_model=schema.Post)
 def get_post(id : int,db:Session = Depends(get_db)):
     # cursor.execute("""SELECT * FROM posts WHERE id = %s""",(str(id)))
     # post = cursor.fetchone()
@@ -136,8 +129,8 @@ def delete_post(id : int,db:Session = Depends(get_db)):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@app.put("/posts/{id}")
-def update_post(id : int, updated_post: Post,db:Session = Depends(get_db)):
+@app.put("/posts/{id}", response_model=schema.Post)
+def update_post(id : int, updated_post: schema.PostCreate, db:Session = Depends(get_db)):
     # index = find_index_post(id)
     #steps for SQl Query
     # cursor.execute("""UPDATE posts SET title = %s, content = %s, Published = %s WHERE id = %s RETURNING * """
