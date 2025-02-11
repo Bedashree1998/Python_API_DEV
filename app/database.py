@@ -12,9 +12,9 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def get_db():
-    db = SessionLocal()
+    db = SessionLocal()  # Create a new database session
     try:
-        yield get_db
+        yield db  # Yield the session so FastAPI can use it
     finally:
-        db.close() 
+        db.close()  # Close session after request
 
