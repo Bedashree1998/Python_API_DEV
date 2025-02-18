@@ -17,7 +17,7 @@ def get_posts(db:Session = Depends(get_db), get_current_user: int = Depends(oaut
     print(type(db))
 
     posts = db.query(models.Post).all()
-    return {"data": posts}
+    return posts
 
     
 @router.post("/", status_code= status.HTTP_201_CREATED,response_model=schema.Post)
@@ -40,7 +40,10 @@ def create_posts(post: schema.PostCreate ,db: Session = Depends(get_db), get_cur
     #using SQLAlchemy
     # new_post = models.Post(title=post.title, content=post.content, published=post.published)
     print(get_current_user.email)
-    new_post = models.Post(**post.model_dump())
+    print(get_current_user.id)
+    
+    new_post = models.Post(owner_id = get_current_user.id, **post.model_dump())
+    print(new_post.owner_id)
     db.add(new_post)
     db.commit()
     db.refresh(new_post)
@@ -67,10 +70,10 @@ def get_post(id : int,db:Session = Depends(get_db), get_current_user: int = Depe
         raise HTTPException(status_code= status.HTTP_404_NOT_FOUND,
                             detail = f"post with id: {id} was not found" )
 
-    return {"post_detail":post}
+    return post
 
 @router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_post(id : int,db:Session = Depends(get_db), get_current_user: int = Depends(oauth2.get_current_user)):
+def delete_post(id : int,db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_current_user)):
     #deleteing post
     #find the index in the array that has required ID
     # index = find_index_post(id)
@@ -78,12 +81,16 @@ def delete_post(id : int,db:Session = Depends(get_db), get_current_user: int = D
     # cursor.execute("""DELETE FROM posts WHERE id = %s RETURNING * """,(str(id)))
     # deleted_post = cursor.fetchone()
     # conn.commit()
-    post = db.query(models.Post).filter(models.Post.id == id)
+    post_query = db.query(models.Post).filter(models.Post.id == id)
+    post = post_query.first()
 
-    if post.first() == None:
+    if post == None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail= f"post with id: {id} does not exist")
     
-    post.delete(synchronise_session = False)
+    if post.owner_id != oauth2.get_current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Not authorised to perform requested action")
+    
+    post.delete(synchronize_session=False)
     db.commit()
 
     
@@ -92,7 +99,7 @@ def delete_post(id : int,db:Session = Depends(get_db), get_current_user: int = D
 
 
 @router.put("/{id}", response_model=schema.Post)
-def update_post(id : int, updated_post: schema.PostCreate, db:Session = Depends(get_db), get_current_user: int = Depends(oauth2.get_current_user)):
+def update_post(id : int, updated_post: schema.PostCreate, db:Session = Depends(get_db), current_user: int = Depends(oauth2.get_current_user)):
     # index = find_index_post(id)
     #steps for SQl Query
     # cursor.execute("""UPDATE posts SET title = %s, content = %s, Published = %s WHERE id = %s RETURNING * """
@@ -104,6 +111,9 @@ def update_post(id : int, updated_post: schema.PostCreate, db:Session = Depends(
     if post == None:
      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, 
     detail = f"post with id: {id} does not exist") 
+
+    if post.owner_id != oauth2.current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Not authorised to perform requested action")
 
     # post_dict = post.model_dump()
     # post_dict["id"] = id   
